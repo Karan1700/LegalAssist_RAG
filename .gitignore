@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Database
+*.db
+
+# FAISS index
+faiss_index/
+
+# Node
+node_modules/
+
+# React build
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
