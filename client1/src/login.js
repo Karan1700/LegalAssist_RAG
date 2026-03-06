@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
+const BACKEND_URL="http://127.0.0.1:8000";
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -16,12 +17,11 @@ export default function Login({ onLogin }) {
     }
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/login", {
+      const res = await axios.post(`${BACKEND_URL}/login`, {
         username,
         password,
       });
 
-      // ✅ FIXED
       if (!res.data.success) {
         setMsg("❌ " + res.data.message);
         setIsError(true);
@@ -49,12 +49,11 @@ export default function Login({ onLogin }) {
     }
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/signup", {
+      const res = await axios.post(`${BACKEND_URL}/signup`, {
         username,
         password,
       });
 
-      // ✅ FIXED
       if (!res.data.success) {
         setMsg("❌ " + res.data.message);
         setIsError(true);
@@ -94,7 +93,6 @@ export default function Login({ onLogin }) {
         <div style={styles.card}>
           <h2>Login / Signup</h2>
 
-          {/* ✅ MESSAGE */}
           {msg && (
             <p
               style={{

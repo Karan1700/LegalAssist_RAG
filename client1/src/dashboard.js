@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { FaUserCircle } from "react-icons/fa";
 
+const BACKEND_URL="http://127.0.0.1:8000";
+
 export default function Dashboard({ onLogout }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -16,9 +18,7 @@ export default function Dashboard({ onLogout }) {
     if (!username) return;
 
     try {
-      const res = await axios.get(
-        `http://127.0.0.1:8000/chats/${username}`
-      );
+      const res = await axios.get(`${BACKEND_URL}/chats/${username}`);
       setChatList(res.data);
     } catch (e) {
       console.log("Error loading chats");
@@ -29,7 +29,7 @@ export default function Dashboard({ onLogout }) {
     loadChats();
   }, [loadChats]);
 
-  // Auto scroll
+  // ✅ Auto scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -42,10 +42,10 @@ export default function Dashboard({ onLogout }) {
     setMessages((prev) => [...prev, userMsg]);
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/ask", {
+      const res = await axios.post(`${BACKEND_URL}/ask`, {
         question: input,
         username: username,
-        session_id: sessionId, // ✅ FIXED
+        session_id: sessionId,
       });
 
       const botMsg = { role: "assistant", message: res.data.answer };
@@ -69,13 +69,13 @@ export default function Dashboard({ onLogout }) {
 
     try {
       const res = await axios.post(
-        `http://127.0.0.1:8000/new_chat/${username}`
+        `${BACKEND_URL}/new_chat/${username}`
       );
 
-      setSessionId(res.data.session_id); // ✅ FIXED
+      setSessionId(res.data.session_id);
       setMessages([]);
 
-      await loadChats(); // ✅ IMPORTANT (refresh sidebar)
+      await loadChats();
     } catch (e) {
       console.log("Error creating chat");
     }
@@ -86,9 +86,7 @@ export default function Dashboard({ onLogout }) {
     setSessionId(id);
 
     try {
-      const res = await axios.get(
-        `http://127.0.0.1:8000/messages/${id}` // ✅ FIXED
-      );
+      const res = await axios.get(`${BACKEND_URL}/messages/${id}`);
       setMessages(res.data);
     } catch (e) {
       console.log("Error loading messages");
@@ -107,7 +105,7 @@ export default function Dashboard({ onLogout }) {
           </button>
 
           <div style={styles.chatList}>
-            {chatList.map((chat, i) => (
+            {chatList.map((chat) => (
               <div
                 key={chat.id}
                 style={styles.chatItem}
