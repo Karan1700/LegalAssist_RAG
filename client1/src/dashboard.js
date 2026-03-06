@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { FaUserCircle } from "react-icons/fa";
 
-const BACKEND_URL="http://127.0.0.1:8000";
+const BACKEND_URL="https://legalassist-rag.onrender.com";
 
 export default function Dashboard({ onLogout }) {
   const [messages, setMessages] = useState([]);
