@@ -1,10 +1,17 @@
+fastapi
+uvicorn[standard]
+
+sqlalchemy
+python-dotenv
+
 google-generativeai
+
 langchain
 langchain-community
 langchain-text-splitters
+
 faiss-cpu
 pypdf
+
 sentence-transformers
-python-dotenv
-fastapi
-uvicorn[standard]
+torch --index-url https://download.pytorch.org/whl/cpu

@@ -6,7 +6,7 @@ from database import SessionLocal, init_db
 from models import User, ChatSession, ChatMessage
 from rag_pipeline import load_rag_pipeline, ask_question
 
-import os
+import threading
 
 app = FastAPI()
 
@@ -14,14 +14,20 @@ print("🚀 FastAPI starting...")
 
 init_db()
 
-# Load RAG once when server starts
-@app.on_event("startup")
-def startup_event():
+# -------- Load RAG in background (important for Render) -------- #
+def load_rag_background():
     print("📚 Loading RAG pipeline...")
     load_rag_pipeline()
     print("✅ RAG pipeline ready")
 
 
+@app.on_event("startup")
+def startup_event():
+    thread = threading.Thread(target=load_rag_background)
+    thread.start()
+
+
+# ---------------- CORS ---------------- #
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -144,6 +150,7 @@ def get_messages(session_id: int, db: Session = Depends(get_db)):
     return [{"role": m.role, "message": m.message} for m in messages]
 
 
+# ---------------- HEALTH CHECK ---------------- #
 @app.get("/")
 def health():
     return {"status": "running"}
