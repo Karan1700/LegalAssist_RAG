@@ -4,11 +4,23 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import SessionLocal, init_db
 from models import User, ChatSession, ChatMessage
-from rag_pipeline import ask_question
+from rag_pipeline import load_rag_pipeline, ask_question
+
+import os
 
 app = FastAPI()
 
+print("🚀 FastAPI starting...")
+
 init_db()
+
+# Load RAG once when server starts
+@app.on_event("startup")
+def startup_event():
+    print("📚 Loading RAG pipeline...")
+    load_rag_pipeline()
+    print("✅ RAG pipeline ready")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -130,3 +142,8 @@ def get_messages(session_id: int, db: Session = Depends(get_db)):
     ).all()
 
     return [{"role": m.role, "message": m.message} for m in messages]
+
+
+@app.get("/")
+def health():
+    return {"status": "running"}
