@@ -8,4 +8,5 @@ sentence-transformers
 python-dotenv
 fastapi
 uvicorn[standard]
-passlib[bcrypt]
+bcrypt==4.0.1
+sqlalchemy
