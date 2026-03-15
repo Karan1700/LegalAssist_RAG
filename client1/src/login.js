@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const BACKEND_URL="https://legalassist-rag.onrender.com";
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 export default function Login({ onLogin }) {
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
@@ -10,6 +12,7 @@ export default function Login({ onLogin }) {
 
   // ---------------- LOGIN ----------------
   const handleLogin = async () => {
+
     if (!username || !password) {
       setMsg("⚠️ Please enter username and password");
       setIsError(true);
@@ -17,9 +20,10 @@ export default function Login({ onLogin }) {
     }
 
     try {
+
       const res = await axios.post(`${BACKEND_URL}/login`, {
-        username,
-        password,
+        username: username,
+        password: password
       });
 
       if (!res.data.success) {
@@ -28,20 +32,33 @@ export default function Login({ onLogin }) {
         return;
       }
 
-      setMsg("✅ " + res.data.message);
+      setMsg("✅ Login successful");
       setIsError(false);
 
+      // Save username
       localStorage.setItem("username", username);
-      onLogin();
+
+      // ✅ Auto create first chat session
+      try {
+        await axios.post(`${BACKEND_URL}/new_chat/${username}`);
+      } catch {
+        console.log("Session creation failed (will create later)");
+      }
+
+      // Go to dashboard
+      onLogin(username);
 
     } catch (err) {
-      setMsg("⚠️ Server error");
+
+      setMsg("⚠️ Server error. Backend may not be running.");
       setIsError(true);
+
     }
   };
 
   // ---------------- SIGNUP ----------------
   const handleSignup = async () => {
+
     if (!username || !password) {
       setMsg("⚠️ Please enter username and password");
       setIsError(true);
@@ -49,9 +66,10 @@ export default function Login({ onLogin }) {
     }
 
     try {
+
       const res = await axios.post(`${BACKEND_URL}/signup`, {
-        username,
-        password,
+        username: username,
+        password: password
       });
 
       if (!res.data.success) {
@@ -60,37 +78,50 @@ export default function Login({ onLogin }) {
         return;
       }
 
-      setMsg("✅ " + res.data.message);
+      setMsg("✅ Signup successful! Please login.");
       setIsError(false);
 
-    } catch (err) {
+    } catch {
+
       setMsg("⚠️ Server error");
       setIsError(true);
+
     }
   };
 
   // ---------------- GUEST ----------------
   const handleGuest = () => {
+
     localStorage.removeItem("username");
-    onLogin();
+    onLogin(null);
+
   };
 
   return (
     <div style={styles.container}>
-      {/* LEFT */}
+
+      {/* LEFT SIDE */}
       <div style={styles.left}>
+
         <h1 style={styles.logo}>⚖️ LegalMind AI</h1>
-        <h2 style={styles.heading}>Your AI Legal Assistant</h2>
+
+        <h2 style={styles.heading}>
+          Your AI Legal Assistant
+        </h2>
 
         <p style={styles.desc}>
-          Ask questions from legal documents using RAG-powered AI.
+          Ask questions from legal documents using
+          Retrieval Augmented Generation (RAG).
           Get accurate answers instantly.
         </p>
+
       </div>
 
-      {/* RIGHT */}
+      {/* RIGHT SIDE */}
       <div style={styles.right}>
+
         <div style={styles.card}>
+
           <h2>Login / Signup</h2>
 
           {msg && (
@@ -119,24 +150,37 @@ export default function Login({ onLogin }) {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <button style={styles.loginBtn} onClick={handleLogin}>
+          <button
+            style={styles.loginBtn}
+            onClick={handleLogin}
+          >
             Login
           </button>
 
-          <button style={styles.signupBtn} onClick={handleSignup}>
+          <button
+            style={styles.signupBtn}
+            onClick={handleSignup}
+          >
             Signup
           </button>
 
-          <button style={styles.guestBtn} onClick={handleGuest}>
+          <button
+            style={styles.guestBtn}
+            onClick={handleGuest}
+          >
             Continue as Guest
           </button>
+
         </div>
+
       </div>
+
     </div>
   );
 }
 
 const styles = {
+
   container: {
     display: "flex",
     height: "100vh",
@@ -169,6 +213,7 @@ const styles = {
   desc: {
     marginTop: "15px",
     opacity: 0.8,
+    maxWidth: "400px",
   },
 
   right: {
@@ -231,4 +276,5 @@ const styles = {
     color: "white",
     cursor: "pointer",
   },
+
 };

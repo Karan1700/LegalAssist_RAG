@@ -8,7 +8,7 @@ venv/
 *.db
 
 # FAISS index
-faiss_index/
+
 
 # Node
 node_modules/

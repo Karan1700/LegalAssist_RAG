@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import SessionLocal, init_db
 from models import User, ChatSession, ChatMessage
 from rag_pipeline import load_rag_pipeline, ask_question
+from auth import hash_password, verify_password
 
 import threading
 
@@ -14,10 +15,16 @@ print("🚀 FastAPI starting...")
 
 init_db()
 
-# -------- Load RAG in background (important for Render) -------- #
+# ---------- RAG STATUS FLAG ----------
+rag_ready = False
+
+
 def load_rag_background():
+    global rag_ready
+
     print("📚 Loading RAG pipeline...")
     load_rag_pipeline()
+    rag_ready = True
     print("✅ RAG pipeline ready")
 
 
@@ -27,7 +34,7 @@ def startup_event():
     thread.start()
 
 
-# ---------------- CORS ---------------- #
+# ---------- CORS ----------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,7 +43,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- DB ---------------- #
+
+# ---------- DATABASE ----------
 def get_db():
     db = SessionLocal()
     try:
@@ -45,7 +53,7 @@ def get_db():
         db.close()
 
 
-# ---------------- SIGNUP ---------------- #
+# ---------- SIGNUP ----------
 @app.post("/signup")
 def signup(data: dict = Body(...), db: Session = Depends(get_db)):
     username = data.get("username")
@@ -59,14 +67,18 @@ def signup(data: dict = Body(...), db: Session = Depends(get_db)):
     if existing:
         return {"success": False, "message": "User already exists"}
 
-    new_user = User(username=username, password=password)
+    new_user = User(
+        username=username,
+        password=hash_password(password)
+    )
+
     db.add(new_user)
     db.commit()
 
     return {"success": True, "message": "Signup successful 🎉"}
 
 
-# ---------------- LOGIN ---------------- #
+# ---------- LOGIN ----------
 @app.post("/login")
 def login(data: dict = Body(...), db: Session = Depends(get_db)):
     username = data.get("username")
@@ -75,22 +87,29 @@ def login(data: dict = Body(...), db: Session = Depends(get_db)):
     if not username or not password:
         return {"success": False, "message": "Please enter username and password"}
 
-    user = db.query(User).filter(
-        User.username == username,
-        User.password == password
-    ).first()
+    user = db.query(User).filter(User.username == username).first()
 
     if not user:
-        return {"success": False, "message": "User not found ❌"}
+        return {"success": False, "message": "User not found"}
 
-    return {"success": True, "message": "Login successful ✅"}
+    if not verify_password(password, user.password):
+        return {"success": False, "message": "Invalid password"}
+
+    return {"success": True, "message": "Login successful", "username": username}
 
 
-# ---------------- ASK ---------------- #
+# ---------- ASK ----------
 @app.post("/ask")
 def ask(data: dict = Body(...), db: Session = Depends(get_db)):
+    global rag_ready
+
+    if not rag_ready:
+        return {
+            "answer": "⚠️ AI is still loading. Please try again in few seconds.",
+            "sources": []
+        }
+
     question = data.get("question")
-    username = data.get("username")
     session_id = data.get("session_id")
 
     if not question:
@@ -98,26 +117,37 @@ def ask(data: dict = Body(...), db: Session = Depends(get_db)):
 
     answer, sources = ask_question(question)
 
-    if username and session_id:
-        msg1 = ChatMessage(session_id=session_id, role="user", message=question)
-        msg2 = ChatMessage(session_id=session_id, role="assistant", message=answer)
+    if session_id:
+        msg_user = ChatMessage(
+            session_id=session_id,
+            role="user",
+            message=question
+        )
 
-        db.add(msg1)
-        db.add(msg2)
+        msg_ai = ChatMessage(
+            session_id=session_id,
+            role="assistant",
+            message=answer
+        )
+
+        db.add(msg_user)
+        db.add(msg_ai)
         db.commit()
 
     return {"answer": answer, "sources": list(sources)}
 
 
-# ---------------- NEW CHAT ---------------- #
+# ---------- NEW CHAT ----------
 @app.post("/new_chat/{username}")
 def new_chat(username: str, db: Session = Depends(get_db)):
+
     user = db.query(User).filter(User.username == username).first()
 
     if not user:
         return {"success": False, "message": "User not found"}
 
     session = ChatSession(user_id=user.id)
+
     db.add(session)
     db.commit()
     db.refresh(session)
@@ -125,9 +155,10 @@ def new_chat(username: str, db: Session = Depends(get_db)):
     return {"success": True, "session_id": session.id}
 
 
-# ---------------- CHAT LIST ---------------- #
+# ---------- CHAT LIST ----------
 @app.get("/chats/{username}")
 def get_chats(username: str, db: Session = Depends(get_db)):
+
     user = db.query(User).filter(User.username == username).first()
 
     if not user:
@@ -140,17 +171,24 @@ def get_chats(username: str, db: Session = Depends(get_db)):
     return [{"id": s.id} for s in sessions]
 
 
-# ---------------- LOAD CHAT ---------------- #
+# ---------- LOAD CHAT ----------
 @app.get("/messages/{session_id}")
 def get_messages(session_id: int, db: Session = Depends(get_db)):
+
     messages = db.query(ChatMessage).filter(
         ChatMessage.session_id == session_id
     ).all()
 
-    return [{"role": m.role, "message": m.message} for m in messages]
+    return [
+        {
+            "role": m.role,
+            "message": m.message
+        }
+        for m in messages
+    ]
 
 
-# ---------------- HEALTH CHECK ---------------- #
+# ---------- HEALTH ----------
 @app.get("/")
 def health():
     return {"status": "running"}
