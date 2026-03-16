@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { FaUserCircle } from "react-icons/fa";
 
-const BACKEND_URL = "https://legalassist-rag.onrender.com";
+const BACKEND_URL = "http://127.0.0.1:8000";
 
 export default function Dashboard({ onLogout }) {
 
@@ -12,11 +12,14 @@ export default function Dashboard({ onLogout }) {
   const [chatList, setChatList] = useState([]);
 
   const chatEndRef = useRef(null);
+
   const username = localStorage.getItem("username");
+  const isGuest = localStorage.getItem("guest") === "true";
 
   // ---------------- LOAD CHAT LIST ----------------
   const loadChats = useCallback(async () => {
 
+    if (isGuest) return;
     if (!username) return;
 
     try {
@@ -24,23 +27,20 @@ export default function Dashboard({ onLogout }) {
       const res = await axios.get(`${BACKEND_URL}/chats/${username}`);
       setChatList(res.data);
 
-      // ✅ Auto-load latest chat
       if (res.data.length > 0 && !sessionId) {
 
         const latest = res.data[res.data.length - 1].id;
-
         setSessionId(latest);
 
         const msgRes = await axios.get(`${BACKEND_URL}/messages/${latest}`);
         setMessages(msgRes.data);
-
       }
 
     } catch {
       console.log("Error loading chats");
     }
 
-  }, [username, sessionId]);
+  }, [username, sessionId, isGuest]);
 
   useEffect(() => {
     loadChats();
@@ -56,20 +56,20 @@ export default function Dashboard({ onLogout }) {
 
     if (!input.trim()) return;
 
-    if (!sessionId) {
+    // guest → no session required
+    if (!sessionId && !isGuest && username) {
       alert("Please create a new chat first");
       return;
     }
 
     const userMsg = { role: "user", message: input };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
 
     try {
 
       const res = await axios.post(`${BACKEND_URL}/ask`, {
         question: input,
-        username: username,
-        session_id: sessionId
+        session_id: isGuest ? null : sessionId
       });
 
       const botMsg = {
@@ -77,11 +77,11 @@ export default function Dashboard({ onLogout }) {
         message: res.data.answer
       };
 
-      setMessages((prev) => [...prev, botMsg]);
+      setMessages(prev => [...prev, botMsg]);
 
     } catch {
 
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { role: "assistant", message: "⚠️ Error fetching response" }
       ]);
@@ -89,13 +89,12 @@ export default function Dashboard({ onLogout }) {
     }
 
     setInput("");
-
   };
 
   // ---------------- NEW CHAT ----------------
   const handleNewChat = async () => {
 
-    if (!username) {
+    if (isGuest) {
       setMessages([]);
       return;
     }
@@ -108,14 +107,11 @@ export default function Dashboard({ onLogout }) {
 
       setSessionId(id);
       setMessages([]);
-
-      // update sidebar instantly
-      setChatList((prev) => [...prev, { id: id }]);
+      setChatList(prev => [...prev, { id }]);
 
     } catch {
       console.log("Error creating chat");
     }
-
   };
 
   // ---------------- LOAD EXISTING CHAT ----------------
@@ -124,24 +120,40 @@ export default function Dashboard({ onLogout }) {
     setSessionId(id);
 
     try {
-
       const res = await axios.get(`${BACKEND_URL}/messages/${id}`);
-
       setMessages(res.data);
+    } catch {
+      console.log("Error loading messages");
+    }
+  };
+
+  // ---------------- DELETE CHAT ----------------
+  const deleteChat = async (id) => {
+
+    const confirmDelete = window.confirm("Delete this chat?");
+    if (!confirmDelete) return;
+
+    try {
+
+      await axios.delete(`${BACKEND_URL}/chat/${id}`);
+
+      setChatList(prev => prev.filter(c => c.id !== id));
+
+      if (sessionId === id) {
+        setSessionId(null);
+        setMessages([]);
+      }
 
     } catch {
-
-      console.log("Error loading messages");
-
+      alert("Error deleting chat");
     }
-
   };
 
   return (
     <div style={styles.container}>
 
       {/* Sidebar */}
-      {username && (
+      {!isGuest && username && (
         <div style={styles.sidebar}>
 
           <h3>💬 Chats</h3>
@@ -155,13 +167,31 @@ export default function Dashboard({ onLogout }) {
 
           <div style={styles.chatList}>
 
-            {chatList.map((chat) => (
+            {chatList.map(chat => (
               <div
                 key={chat.id}
-                style={styles.chatItem}
-                onClick={() => loadChat(chat.id)}
+                style={{
+                  ...styles.chatItem,
+                  background:
+                    sessionId === chat.id
+                      ? "rgba(99,102,241,0.3)"
+                      : "rgba(255,255,255,0.05)"
+                }}
               >
-                Chat #{chat.id}
+                <span
+                  style={{ flex: 1 }}
+                  onClick={() => loadChat(chat.id)}
+                >
+                  Chat #{chat.id}
+                </span>
+
+                <span
+                  style={styles.deleteBtn}
+                  onClick={() => deleteChat(chat.id)}
+                >
+                  🗑
+                </span>
+
               </div>
             ))}
 
@@ -174,20 +204,13 @@ export default function Dashboard({ onLogout }) {
       <div style={styles.chatContainer}>
 
         <div style={styles.topBar}>
-
           <h2>⚖️ LegalMind AI</h2>
-
-          <FaUserCircle
-            style={styles.icon}
-            onClick={onLogout}
-          />
-
+          <FaUserCircle style={styles.icon} onClick={onLogout} />
         </div>
 
         <div style={styles.chatArea}>
 
           {messages.map((msg, i) => (
-
             <div
               key={i}
               style={
@@ -198,7 +221,6 @@ export default function Dashboard({ onLogout }) {
             >
               {msg.message}
             </div>
-
           ))}
 
           <div ref={chatEndRef} />
@@ -233,20 +255,17 @@ export default function Dashboard({ onLogout }) {
 }
 
 const styles = {
-
   container: {
     display: "flex",
     height: "100vh",
     background: "linear-gradient(135deg, #020617, #0f172a)",
     color: "white",
   },
-
   sidebar: {
     width: "250px",
     padding: "20px",
     borderRight: "1px solid rgba(255,255,255,0.1)",
   },
-
   newChatBtn: {
     width: "100%",
     padding: "10px",
@@ -257,31 +276,30 @@ const styles = {
     color: "white",
     cursor: "pointer",
   },
-
-  chatList: {
-    marginTop: "10px"
-  },
-
+  chatList: { marginTop: "10px" },
   chatItem: {
     padding: "10px",
     marginBottom: "8px",
     borderRadius: "8px",
     cursor: "pointer",
-    background: "rgba(255,255,255,0.05)",
+    display: "flex",
+    alignItems: "center",
   },
-
+  deleteBtn: {
+    marginLeft: "10px",
+    cursor: "pointer",
+    opacity: 0.6,
+  },
   chatContainer: {
     flex: 1,
     display: "flex",
     flexDirection: "column",
   },
-
   topBar: {
     padding: "15px",
     display: "flex",
     justifyContent: "space-between",
   },
-
   chatArea: {
     flex: 1,
     overflowY: "auto",
@@ -290,7 +308,6 @@ const styles = {
     flexDirection: "column",
     gap: "10px",
   },
-
   userBubble: {
     alignSelf: "flex-end",
     background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
@@ -298,7 +315,6 @@ const styles = {
     borderRadius: "15px",
     maxWidth: "60%",
   },
-
   botBubble: {
     alignSelf: "flex-start",
     background: "#1e293b",
@@ -306,13 +322,11 @@ const styles = {
     borderRadius: "15px",
     maxWidth: "60%",
   },
-
   inputArea: {
     display: "flex",
     padding: "15px",
     borderTop: "1px solid rgba(255,255,255,0.1)",
   },
-
   input: {
     flex: 1,
     padding: "14px",
@@ -322,7 +336,6 @@ const styles = {
     color: "white",
     outline: "none",
   },
-
   sendBtn: {
     marginLeft: "10px",
     padding: "12px 16px",
@@ -332,10 +345,8 @@ const styles = {
     color: "white",
     cursor: "pointer",
   },
-
   icon: {
     fontSize: "22px",
     cursor: "pointer",
   }
-
 };

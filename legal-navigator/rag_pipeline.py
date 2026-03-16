@@ -5,6 +5,7 @@ import google.generativeai as genai
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
+
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -40,7 +41,7 @@ def ask_question(query):
     if db is None:
         return "RAG system is still loading. Please try again.", []
 
-    docs = db.similarity_search(query, k=6)
+    docs = db.similarity_search(query, k=3)
 
     context = "\n".join([doc.page_content for doc in docs])
     sources = [doc.metadata.get("source", "unknown") for doc in docs]

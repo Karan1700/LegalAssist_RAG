@@ -122,6 +122,7 @@ def ask(data: dict = Body(...), db: Session = Depends(get_db)):
 
     answer, sources = ask_question(question)
 
+    # ✅ SAVE ONLY IF SESSION EXISTS (Logged in user)
     if session_id:
         msg_user = ChatMessage(
             session_id=session_id,
@@ -140,7 +141,6 @@ def ask(data: dict = Body(...), db: Session = Depends(get_db)):
         db.commit()
 
     return {"answer": answer, "sources": list(sources)}
-
 
 # ---------- NEW CHAT ----------
 @app.post("/new_chat/{username}")
@@ -191,6 +191,30 @@ def get_messages(session_id: int, db: Session = Depends(get_db)):
         }
         for m in messages
     ]
+
+# ---------- DELETE CHAT ----------
+@app.delete("/chat/{session_id}")
+def delete_chat(session_id: int, db: Session = Depends(get_db)):
+
+    # check session exists
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id
+    ).first()
+
+    if not session:
+        return {"success": False, "message": "Chat not found"}
+
+    # delete all messages of that chat
+    db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id
+    ).delete()
+
+    # delete chat session
+    db.delete(session)
+
+    db.commit()
+
+    return {"success": True, "message": "Chat deleted successfully"}
 
 
 # ---------- HEALTH ----------

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const BACKEND_URL = "https://legalassist-rag.onrender.com";
+const BACKEND_URL = "http://127.0.0.1:8000";
 
 export default function Login({ onLogin }) {
 
@@ -35,20 +35,22 @@ export default function Login({ onLogin }) {
       setMsg("✅ Login successful");
       setIsError(false);
 
-      // Save username
+      // ✅ Save username
       localStorage.setItem("username", username);
+
+      // ✅ Remove guest flag
+      localStorage.removeItem("guest");
 
       // ✅ Auto create first chat session
       try {
         await axios.post(`${BACKEND_URL}/new_chat/${username}`);
       } catch {
-        console.log("Session creation failed (will create later)");
+        console.log("Session creation failed");
       }
 
-      // Go to dashboard
       onLogin(username);
 
-    } catch (err) {
+    } catch {
 
       setMsg("⚠️ Server error. Backend may not be running.");
       setIsError(true);
@@ -92,7 +94,13 @@ export default function Login({ onLogin }) {
   // ---------------- GUEST ----------------
   const handleGuest = () => {
 
+    // ✅ Remove username
     localStorage.removeItem("username");
+
+    // ✅ Set guest flag
+    localStorage.setItem("guest", "true");
+
+    // Go dashboard
     onLogin(null);
 
   };
